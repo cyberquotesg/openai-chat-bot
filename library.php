@@ -271,7 +271,7 @@ class library
 		// save message to db
 		self::db("
 			INSERT INTO openai_message (created, thread_id, message_id, role, content)
-			VALUES ('" . $message["created"] . "', '" . $message["thread_id"] . "', '" . $message["message_id"] . "', '" . $message["role"] . "', '" . $message["content"] . "')
+			VALUES ('" . $message["created"] . "', '" . $message["thread_id"] . "', '" . $message["message_id"] . "', '" . $message["role"] . "', '" . str_replace("'", "\\'", $message["content"]) . "')
 		");
 
 		// create run

@@ -17,7 +17,9 @@
 	<style type="text/css">
 	#threads
 	{
-		height: calc(100vh - 200px + 65px);
+		height: calc(100vh - 240px + 65px);
+		padding-right: 12px;
+		overflow-y: scroll;
 	}
 	#threads a
 	{
@@ -33,20 +35,27 @@
 	}
 	#chat-room
 	{
-		height: calc(100vh - 200px);
+		height: calc(100vh - 240px);
+		padding-right: 12px;
+		overflow-y: scroll;
 	}
 	#chat-room .chat
 	{
+		width: calc(100% - 62px - 12px);
+	    padding: 12px;
+		margin-bottom: 12px;
+	    border: 1px solid grey;
+	    border-radius: 4px;
 	}
 	#chat-room .chat.user
 	{
 		text-align: right;
-		padding-left: 48px;
+    	margin-left: calc(62px + 12px);
 	}
 	#chat-room .chat.assistant
 	{
 		text-align: left;
-		padding-right: 48px;
+		margin-right: calc(62px + 12px);
 	}
 	#chat-control
 	{
@@ -68,6 +77,39 @@
 	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
 	<script type="text/javascript">
 		jQuery(function($){
+			function insertNewMessage(message)
+			{
+				var html = '';
+				html += '<div class="chat ' + message.role + '">';
+					html += '<small>' + message.created + '</small><br />' + message.content;
+				html += '</div>';
+
+				$("#chat-room").append(html);
+				$("#chat-room").animate({ scrollTop: $("#chat-room").height() }, 1000);
+			}
+			function checkReply()
+			{
+				$.get("./api.php?function=check_reply&params[]=<?= $active_thread["thread_id"] ?>", function(reply){
+					if (reply.code == 2)
+					{
+						for (var message of reply.messages)
+						{
+							insertNewMessage(message);
+						}
+					}
+
+					setTimeout(checkReply, 1000);
+				}, "json");
+			}
+
+			// scroll down
+			$("#chat-room").animate({ scrollTop: $("#chat-room").height() }, 0);
+
+			// if this is not new, then periodically check new chats
+			<?php if (!$new): ?>
+				checkReply();
+			<?php endif; ?>
+
 			// new thread
 			$("#chat-send").click(function(){
 				var value = $("#chat-field").val();
@@ -96,52 +138,22 @@
 						],
 					}, function(message){
 						$("#chat-field").val("");
-
-						var html = '';
-						html += '<div class="chat ' + message.role + '">';
-							html += '<small>' + message.created + '</small><br />' + message.content;
-						html += '</div>';
-
-						$("#chat-room").append(html);
+						insertNewMessage(message);
 					}, "json");
 				}
 			});
-
-			// if this is not new, then periodically check new chats
-			<?php if (!$new): ?>
-				function checkReply()
-				{
-					$.get("./api.php?function=check_reply&params[]=<?= $active_thread["thread_id"] ?>", function(reply){
-						if (reply.code == 2)
-						{
-							for (var message of reply.messages)
-							{
-								var html = '';
-								html += '<div class="chat ' + message.role + '">';
-									html += '<small>' + message.created + '</small><br />' + message.content;
-								html += '</div>';
-
-								$("#chat-room").append(html);
-							}
-						}
-
-						setTimeout(checkReply, 1000);
-					}, "json");
-				}
-				checkReply();
-			<?php endif; ?>
 		});
 	</script>
 </head>
 
 <body>
 
-	<h1 class="text-center mt-4 mb-3">OpenAI Chat Bot</h1>
+	<h1 class="text-center my-4">OpenAI Chat Bot</h1>
 
 	<div class="container">
 		<div class="row">
 			<div class="col-3">
-				<h4 class="text-center">Sessions</h4>
+				<h4 class="text-center mb-4">Sessions</h4>
 				<div id="threads">
 					<a id="new-thread" class="btn <?= $new ? "btn-primary" : "btn-outline-primary" ?>" href="./index.php">New Thread</a>
 
@@ -152,7 +164,7 @@
 				</div>
 			</div>
 			<div class="col-9">
-				<h4 class="text-center">Chat Room</h4>
+				<h4 class="text-center mb-4">Chat Room</h4>
 				<div id="chat-room" data-thread-id="<?= $new ? "null" : $active_thread["thread_id"] ?>">
 					<?php if (!$new): ?>
 						<?php $messages = library::get_messages($active_thread["thread_id"]); ?>
