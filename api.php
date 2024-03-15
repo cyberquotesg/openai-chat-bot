@@ -2,7 +2,8 @@
 
 include "library.php";
 
-$data = call_user_func_array("\\library::" . $_GET["function"], $_GET["params"]);
+header('Content-Type: application/json; charset=utf-8');
+$data = call_user_func_array("\\library::" . $_REQUEST["function"], $_REQUEST["params"]);
 print json_encode($data);
 
 ?>
