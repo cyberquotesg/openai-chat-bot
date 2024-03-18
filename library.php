@@ -200,7 +200,7 @@ class library
 		// get threads from db
 		$threads = self::db("
 			SELECT *
-			FROM openai_thread
+			FROM thread
 			ORDER BY id DESC
 		");
 
@@ -212,7 +212,7 @@ class library
 		// get threads from db
 		$threads = self::db("
 			SELECT *
-			FROM openai_thread
+			FROM thread
 			WHERE thread_id = '" . $thread_id . "'
 		");
 
@@ -224,7 +224,7 @@ class library
 		// get messages from db
 		$messages = self::db("
 			SELECT *
-			FROM openai_message
+			FROM message
 			WHERE thread_id = '" . $thread_id . "'
 		");
 
@@ -247,7 +247,7 @@ class library
 
 		// save thread to db
 		self::db("
-			INSERT INTO openai_thread (created, thread_id, run_id, run_status)
+			INSERT INTO thread (created, thread_id, run_id, run_status)
 			VALUES ('" . $thread["created"] . "', '" . $thread["thread_id"] . "', '" . $thread["run_id"] . "', '" . $thread["run_status"] . "')
 		");
 
@@ -270,7 +270,7 @@ class library
 
 		// save message to db
 		self::db("
-			INSERT INTO openai_message (created, thread_id, message_id, role, content)
+			INSERT INTO message (created, thread_id, message_id, role, content)
 			VALUES ('" . $message["created"] . "', '" . $message["thread_id"] . "', '" . $message["message_id"] . "', '" . $message["role"] . "', '" . str_replace("'", "\\'", $message["content"]) . "')
 		");
 
@@ -279,7 +279,7 @@ class library
 
 		// insert run to thread record
 		self::db("
-			UPDATE openai_thread
+			UPDATE thread
 			SET run_id = '" . $run["id"] . "', run_status = '" . $run["status"] . "'
 			WHERE thread_id = '" . $run["thread_id"] . "'
 		");
@@ -332,14 +332,14 @@ class library
 			foreach ($messages as $message)
 			{
 				self::db("
-					INSERT INTO openai_message (created, thread_id, message_id, role, content)
+					INSERT INTO message (created, thread_id, message_id, role, content)
 					VALUES ('" . $message["created"] . "', '" . $message["thread_id"] . "', '" . $message["message_id"] . "', '" . $message["role"] . "', '" . str_replace("'", "\\'", $message["content"]) . "')
 				");
 			}
 
 			// clean up thread record
 			self::db("
-				UPDATE openai_thread
+				UPDATE thread
 				SET run_id = '', run_status = '" . $run["status"] . "'
 				WHERE thread_id = '" . $thread_id . "'
 			");
@@ -355,7 +355,7 @@ class library
 		{
 			// clean up thread record
 			self::db("
-				UPDATE openai_thread
+				UPDATE thread
 				SET run_id = '', run_status = '" . $run["status"] . "'
 				WHERE thread_id = '" . $thread_id . "'
 			");
@@ -370,7 +370,7 @@ class library
 		{
 			// clean up thread record
 			self::db("
-				UPDATE openai_thread
+				UPDATE thread
 				SET run_status = '" . $run["status"] . "'
 				WHERE thread_id = '" . $thread_id . "'
 			");
