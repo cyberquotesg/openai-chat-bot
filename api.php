@@ -24,8 +24,11 @@ foreach($required_params as $index => $required_param)
 	// maybe it exists on $_FILES
 	else if (isset($_FILES[$param_name]))
 	{
-		if (!file_exists('./files')) mkdir('./files', 0777, true);
-		$params[] = move_uploaded_file($_FILES[$param_name]["tmp_name"], "./files/" . $_FILES[$param_name]["name"]);
+		if (empty($_FILES[$param_name]["size"])) continue;
+
+		if (!file_exists('./files')) mkdir('./files', 777, true);
+		move_uploaded_file($_FILES[$param_name]["tmp_name"], "./files/" . $_FILES[$param_name]["name"]);
+		$params[] = "./files/" . $_FILES[$param_name]["name"];
 	}
 
 	// otherwise, die

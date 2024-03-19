@@ -39,6 +39,10 @@
 		padding-right: 24px;
 		overflow-y: scroll;
 	}
+	#chat-room hr
+	{
+		margin: 6px 0px;
+	}
 	#chat-room .chat
 	{
 		width: calc(100% - 62px - 24px);
@@ -46,6 +50,7 @@
 		margin-bottom: 12px;
 	    border: 1px solid grey;
 	    border-radius: 4px;
+	    white-space: break-spaces;
 	}
 	#chat-room .chat.user
 	{
@@ -56,6 +61,17 @@
 	{
 		text-align: left;
 		margin-right: calc(62px + 24px);
+	}
+	#chat-room .chat.sending
+	{
+		display: none;
+    	width: 42px;
+		text-align: center;
+    	margin-left: auto;
+	}
+	#chat-room.sending .chat.sending
+	{
+		display: block;
 	}
 	#chat-control
 	{
@@ -68,9 +84,14 @@
 		width: 100%;
 		height: 65px;
 	}
+	#chat-control #chat-file-delete
+	{
+		width: 36px;
+		margin-top: 12px;
+	}
 	#chat-control #chat-file
 	{
-		width: calc(100% - 62px - 24px);
+		width: calc(100% - 36px - 62px - 24px);
 		margin-top: 12px;
 	}
 	#chat-control #chat-send
@@ -96,10 +117,12 @@
 			{
 				var html = '';
 				html += '<div class="chat ' + message.role + '">';
-					html += '<small>' + message.created + '</small><br />' + message.content;
+					html += '<small>' + message.created + '</small>';
+					if (message.file_name) html += '<hr />Uploaded file: ' + message.file_name;
+					if (message.content) html += '<hr />' + message.content;
 				html += '</div>';
 
-				$("#chat-room").append(html);
+				$("#chat-room .chat.sending").before(html);
 				$("#chat-room").animate({ scrollTop: $("#chat-room").prop('scrollHeight') }, 1000);
 			}
 			function checkReply()
@@ -128,7 +151,7 @@
 					}, "json");
 				}
 			}
-			function sendMessage(callback)
+			function sendMessageEngine(callback)
 			{
 				$.ajax({
 					// Your server script to process the upload
@@ -148,20 +171,15 @@
 					success: callback,
 				});
 			}
-
-			// scroll down
-			$("#chat-room").animate({ scrollTop: $("#chat-room").prop('scrollHeight') }, 0);
-
-			// periodically check new chats
-			checkReply();
-
-			// send message
-			$("#chat-control").submit(function(e){
-				e.preventDefault();
-			});
-			$("#chat-send").click(function(){
+			function sendMessage()
+			{
+				$("#chat-room").addClass("sending");
 				$("#chat-send").addClass("sending");
+				$("#chat-room").animate({ scrollTop: $("#chat-room").prop('scrollHeight') }, 1000);
+
 				var thread_id = $("#chat-control [name='thread_id']").val();
+				$("#chat-control [name='message']").val($("#chat-control #chat-field").val());
+				$("#chat-control #chat-field").val("");
 
 				// if it is new
 				if (!thread_id)
@@ -169,9 +187,9 @@
 					$.get("./api.php?function=create_new_thread", function(thread){
 						$("#chat-control [name='thread_id']").val(thread.thread_id);
 
-						sendMessage(function(message){
-							$("#chat-field").val("");
+						sendMessageEngine(function(message){
 							insertNewMessage(message);
+							$("#chat-room").removeClass("sending");
 							$("#chat-send").removeClass("sending");
 
 							// active buttons should be deactivated
@@ -197,12 +215,30 @@
 				// if existing
 				else
 				{
-					sendMessage(function(message){
-						$("#chat-field").val("");
+					sendMessageEngine(function(message){
 						insertNewMessage(message);
+						$("#chat-room").removeClass("sending");
 						$("#chat-send").removeClass("sending");
 					});
 				}
+			}
+
+			// scroll down
+			$("#chat-room").animate({ scrollTop: $("#chat-room").prop('scrollHeight') }, 0);
+
+			// periodically check new chats
+			checkReply();
+
+			// send message
+			$("#chat-control").submit(function(e){
+				e.preventDefault();
+			});
+			$("#chat-file-delete").click(function(){
+				$("#chat-file").val("");
+			})
+			$("#chat-send").click(sendMessage);
+			$("#chat-field").keydown(function(e){
+				if (e.ctrlKey && e.keyCode == 13) sendMessage();
 			});
 		});
 	</script>
@@ -231,15 +267,18 @@
 					<?php if (!$new): ?>
 						<?php $messages = library::get_messages($active_thread["thread_id"]); ?>
 						<?php foreach ($messages as $message): ?>
-							<div class="chat <?= $message["role"] ?>">
-								<small><?= $message["created"] ?></small><br /><?= $message["content"] ?>
-							</div>
+							<div class="chat <?= $message["role"] ?>"><small><?= $message["created"] ?></small><?= $message["file_name"] ? ("<hr />Uploaded file: " . $message["file_name"]) : "" ?><?= $message["content"] ? ("<hr />" . $message["content"]) : "" ?></div>
 						<?php endforeach; ?>
 					<?php endif; ?>
+
+					<div class="chat sending"><div class="secondary-text spinner-border spinner-border-sm" role="status"></div></div>
 				</div>
   				<form id="chat-control" class="form-group">
 					<input type="hidden" name="thread_id" value="<?= $new ? "" : $active_thread["thread_id"] ?>" />
-					<textarea id="chat-field" class="form-control" name="message"></textarea>
+					<textarea class="d-none" name="message"></textarea>
+
+					<textarea id="chat-field" class="form-control"></textarea>
+					<button id="chat-file-delete" class="btn btn-danger">X</button>
 					<input id="chat-file" type="file" name="file_path" />
 					<button id="chat-send" class="btn btn-primary" type="button">
 						<span class="primary-text">Send</span>

@@ -306,9 +306,10 @@ class library
 	{
 		// get messages from db
 		$messages = self::db("
-			SELECT *
-			FROM openai_chatbot_message
-			WHERE thread_id = '" . $thread_id . "'
+			SELECT m.*, f.file_name
+			FROM openai_chatbot_message m
+			LEFT JOIN openai_chatbot_file f ON f.file_id = m.file_id
+			WHERE m.thread_id = '" . $thread_id . "'
 		");
 
 		return $messages;
@@ -377,6 +378,7 @@ class library
 			"thread_id" => $message["thread_id"],
 			"message_id" => $message["id"],
 			"file_id" => $file["file_id"],
+			"file_name" => $file["file_name"],
 			"role" => $message["role"],
 			"content" => $message["content"][0]["text"]["value"],
 		];
@@ -420,7 +422,7 @@ class library
 		if ($run["status"] == "completed")
 		{
 			// get message listing
-			$data = self::enlist_message($thread_id, 5);
+			$data = self::enlist_message($thread_id, 10);
 
 			// adjust data from openai to fit with db
 			$messages = [];
@@ -439,7 +441,7 @@ class library
 
 				else break;
 			}
-			array_reverse($messages);
+			$messages = array_reverse($messages);
 
 			// save to db
 			foreach ($messages as $message)
