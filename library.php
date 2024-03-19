@@ -1,9 +1,71 @@
 <?php
 
+/******************************** database /
+
+--
+-- Database: `openai-chatbot`
+--
+CREATE DATABASE IF NOT EXISTS `openai-chatbot` DEFAULT CHARACTER SET latin1 COLLATE latin1_swedish_ci;
+USE `openai-chatbot`;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `file`
+--
+
+DROP TABLE IF EXISTS `openai_chatbot_file`;
+CREATE TABLE IF NOT EXISTS `openai_chatbot_file` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `created` varchar(25) NOT NULL,
+  `file_id` varchar(100) NOT NULL,
+  `file_name` varchar(200) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `message`
+--
+
+DROP TABLE IF EXISTS `openai_chatbot_message`;
+CREATE TABLE IF NOT EXISTS `openai_chatbot_message` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `created` varchar(25) NOT NULL,
+  `thread_id` varchar(100) NOT NULL,
+  `message_id` varchar(100) NOT NULL,
+  `file_id` varchar(100) NOT NULL,
+  `role` varchar(25) NOT NULL,
+  `content` mediumtext NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `openai_chatbot_thread`
+--
+
+DROP TABLE IF EXISTS `openai_chatbot_thread`;
+CREATE TABLE IF NOT EXISTS `openai_chatbot_thread` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `created` varchar(25) NOT NULL,
+  `thread_id` varchar(100) NOT NULL,
+  `run_id` varchar(100) NOT NULL,
+  `run_status` varchar(25) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+/**/
 class library
 {
 	private static $openai_key = "";
 	private static $assistant_id = "";
+	private static $servername = "";
+	private static $username = "";
+	private static $password = "";
+	private static $dbname = "";
 
 	// ================================================================================================== helper
 	// done
@@ -41,12 +103,7 @@ class library
 	// done
 	private static function db($sql)
 	{
-		$servername = "localhost";
-		$username = "root";
-		$password = "";
-		$dbname = "openai-chatbot";
-
-		$connection = mysqli_connect($servername, $username, $password, $dbname);
+		$connection = mysqli_connect(self::$servername, self::$username, self::$password, self::$dbname);
 		if (!$connection) die("Connection failed: " . mysqli_connect_error());
 
 		$data = [];
@@ -226,7 +283,7 @@ class library
 		// get threads from db
 		$threads = self::db("
 			SELECT *
-			FROM thread
+			FROM openai_chatbot_thread
 			ORDER BY id DESC
 		");
 
@@ -238,7 +295,7 @@ class library
 		// get threads from db
 		$threads = self::db("
 			SELECT *
-			FROM thread
+			FROM openai_chatbot_thread
 			WHERE thread_id = '" . $thread_id . "'
 		");
 
@@ -250,7 +307,7 @@ class library
 		// get messages from db
 		$messages = self::db("
 			SELECT *
-			FROM message
+			FROM openai_chatbot_message
 			WHERE thread_id = '" . $thread_id . "'
 		");
 
@@ -274,7 +331,7 @@ class library
 
 		// save thread to db
 		self::db("
-			INSERT INTO thread (created, thread_id, run_id, run_status)
+			INSERT INTO openai_chatbot_thread (created, thread_id, run_id, run_status)
 			VALUES ('" . $thread["created"] . "', '" . $thread["thread_id"] . "', '" . $thread["run_id"] . "', '" . $thread["run_status"] . "')
 		");
 
@@ -298,7 +355,7 @@ class library
 
 			// save file to db
 			self::db("
-				INSERT INTO file (created, file_id, file_name)
+				INSERT INTO openai_chatbot_file (created, file_id, file_name)
 				VALUES ('" . $file["created"] . "', '" . $file["file_id"] . "', '" . $file["file_name"] . "')
 			");
 		}
@@ -326,7 +383,7 @@ class library
 
 		// save message to db
 		self::db("
-			INSERT INTO message (created, thread_id, message_id, role, content)
+			INSERT INTO openai_chatbot_message (created, thread_id, message_id, file_id, role, content)
 			VALUES ('" . $message["created"] . "', '" . $message["thread_id"] . "', '" . $message["message_id"] . "', '" . $message["file_id"] . "', '" . $message["role"] . "', '" . str_replace("'", "\\'", $message["content"]) . "')
 		");
 
@@ -335,7 +392,7 @@ class library
 
 		// insert run to thread record
 		self::db("
-			UPDATE thread
+			UPDATE openai_chatbot_thread
 			SET run_id = '" . $run["id"] . "', run_status = '" . $run["status"] . "'
 			WHERE thread_id = '" . $run["thread_id"] . "'
 		");
@@ -388,14 +445,14 @@ class library
 			foreach ($messages as $message)
 			{
 				self::db("
-					INSERT INTO message (created, thread_id, message_id, file_id, role, content)
+					INSERT INTO openai_chatbot_message (created, thread_id, message_id, file_id, role, content)
 					VALUES ('" . $message["created"] . "', '" . $message["thread_id"] . "', '" . $message["message_id"] . "', '', '" . $message["role"] . "', '" . str_replace("'", "\\'", $message["content"]) . "')
 				");
 			}
 
 			// clean up thread record
 			self::db("
-				UPDATE thread
+				UPDATE openai_chatbot_thread
 				SET run_id = '', run_status = '" . $run["status"] . "'
 				WHERE thread_id = '" . $thread_id . "'
 			");
@@ -411,7 +468,7 @@ class library
 		{
 			// clean up thread record
 			self::db("
-				UPDATE thread
+				UPDATE openai_chatbot_thread
 				SET run_id = '', run_status = '" . $run["status"] . "'
 				WHERE thread_id = '" . $thread_id . "'
 			");

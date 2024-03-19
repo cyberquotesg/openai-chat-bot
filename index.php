@@ -100,7 +100,7 @@
 				html += '</div>';
 
 				$("#chat-room").append(html);
-				$("#chat-room").animate({ scrollTop: $("#chat-room").height() }, 1000);
+				$("#chat-room").animate({ scrollTop: $("#chat-room").prop('scrollHeight') }, 1000);
 			}
 			function checkReply()
 			{
@@ -150,7 +150,7 @@
 			}
 
 			// scroll down
-			$("#chat-room").animate({ scrollTop: $("#chat-room").height() }, 0);
+			$("#chat-room").animate({ scrollTop: $("#chat-room").prop('scrollHeight') }, 0);
 
 			// periodically check new chats
 			checkReply();
@@ -174,12 +174,23 @@
 							insertNewMessage(message);
 							$("#chat-send").removeClass("sending");
 
+							// active buttons should be deactivated
+							$("#threads .btn-primary")
+								.removeClass("btn-primary")
+								.addClass("btn-outline-primary");
+							$("#threads .btn-secondary")
+								.removeClass("btn-secondary")
+								.addClass("btn-outline-secondary");
+
 							// insert session button
 							$("<a>")
 								.addClass("btn existing-thread btn-secondary")
 								.attr("href", "./index.php?thread_id=" + thread.thread_id)
 								.text("Thread " + thread.created)
 								.insertAfter("#new-thread");
+
+							// change the url
+							window.history.replaceState(null, "", "index.php?thread_id=" + thread.thread_id);
 						});
 					}, "json");
 				}
