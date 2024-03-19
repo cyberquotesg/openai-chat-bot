@@ -92,8 +92,33 @@ class library
 
 		return json_decode($result, true);
 	}
+	public static function create_file($file_path)
+	{
+		$ch = curl_init();
+
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_URL, "https://api.openai.com/v1/files");
+		curl_setopt($ch, CURLOPT_HTTPHEADER, [
+			"Authorization: Bearer " . self::$openai_key,
+		]);
+		curl_setopt($ch, CURLOPT_POST, true);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, [
+            "file" => new CURLFile($file_path),
+            "purpose" => "assistants",
+        ]);
+
+		$result = curl_exec($ch);
+		$info = curl_getinfo($ch);
+		$error = curl_error($ch);
+
+		curl_close($ch);
+
+		return json_decode($result, true);
+	}
 	// done
-	public static function create_message($thread_id, $message)
+	public static function create_message($thread_id, $message, $file_id = null)
 	{
 		$ch = curl_init();
 
@@ -110,6 +135,7 @@ class library
 		curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
 			"role" => "user",
 			"content" => $message,
+			"file_ids" => $file_id ? [$file_id] : [],
 		]));
 
 		$result = curl_exec($ch);
@@ -193,7 +219,7 @@ class library
 		return json_decode($result, true);
 	}
 
-	// ================================================================================================== communication with front end
+	// ================================================================================================== communication with database
 	// done
 	public static function get_threads()
 	{
@@ -231,6 +257,7 @@ class library
 		return $messages;
 	}
 
+	// ================================================================================================== communication with front end
 	// done
 	public static function create_new_thread()
 	{
@@ -254,16 +281,45 @@ class library
 		return $thread;
 	}
 	// done
-	public static function post_new_message($thread_id, $message)
+	public static function post_new_message($thread_id, $message, $file_path = null)
 	{
+		// file is provided
+		if ($file_path)
+		{
+			// upload file
+			$file = self::create_file($file_path);
+
+			// adjust data from openai to fit with db
+			$file = [
+				"created" => self::get_time_object($file["created_at"])->format("Y/m/d H:i:s"),
+				"file_id" => $file["id"],
+				"file_name" => $file["filename"],
+			];
+
+			// save file to db
+			self::db("
+				INSERT INTO file (created, file_id, file_name)
+				VALUES ('" . $file["created"] . "', '" . $file["file_id"] . "', '" . $file["file_name"] . "')
+			");
+		}
+		else
+		{
+			$file = [
+				"created" => "",
+				"file_id" => "",
+				"file_name" => "",
+			];
+		}
+
 		// create message
-		$message = self::create_message($thread_id, $message);
+		$message = self::create_message($thread_id, $message, $file["file_id"]);
 
 		// adjust data from openai to fit with db
 		$message = [
 			"created" => self::get_time_object($message["created_at"])->format("Y/m/d H:i:s"),
 			"thread_id" => $message["thread_id"],
 			"message_id" => $message["id"],
+			"file_id" => $file["file_id"],
 			"role" => $message["role"],
 			"content" => $message["content"][0]["text"]["value"],
 		];
@@ -271,7 +327,7 @@ class library
 		// save message to db
 		self::db("
 			INSERT INTO message (created, thread_id, message_id, role, content)
-			VALUES ('" . $message["created"] . "', '" . $message["thread_id"] . "', '" . $message["message_id"] . "', '" . $message["role"] . "', '" . str_replace("'", "\\'", $message["content"]) . "')
+			VALUES ('" . $message["created"] . "', '" . $message["thread_id"] . "', '" . $message["message_id"] . "', '" . $message["file_id"] . "', '" . $message["role"] . "', '" . str_replace("'", "\\'", $message["content"]) . "')
 		");
 
 		// create run
@@ -332,8 +388,8 @@ class library
 			foreach ($messages as $message)
 			{
 				self::db("
-					INSERT INTO message (created, thread_id, message_id, role, content)
-					VALUES ('" . $message["created"] . "', '" . $message["thread_id"] . "', '" . $message["message_id"] . "', '" . $message["role"] . "', '" . str_replace("'", "\\'", $message["content"]) . "')
+					INSERT INTO message (created, thread_id, message_id, file_id, role, content)
+					VALUES ('" . $message["created"] . "', '" . $message["thread_id"] . "', '" . $message["message_id"] . "', '', '" . $message["role"] . "', '" . str_replace("'", "\\'", $message["content"]) . "')
 				");
 			}
 

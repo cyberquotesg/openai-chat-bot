@@ -17,8 +17,8 @@
 	<style type="text/css">
 	#threads
 	{
-		height: calc(100vh - 240px + 65px);
-		padding-right: 12px;
+		height: calc(100vh - 275px + 65px);
+		padding-right: 24px;
 		overflow-y: scroll;
 	}
 	#threads a
@@ -35,13 +35,13 @@
 	}
 	#chat-room
 	{
-		height: calc(100vh - 240px);
-		padding-right: 12px;
+		height: calc(100vh - 275px);
+		padding-right: 24px;
 		overflow-y: scroll;
 	}
 	#chat-room .chat
 	{
-		width: calc(100% - 62px - 12px);
+		width: calc(100% - 62px - 24px);
 	    padding: 12px;
 		margin-bottom: 12px;
 	    border: 1px solid grey;
@@ -50,26 +50,41 @@
 	#chat-room .chat.user
 	{
 		text-align: right;
-    	margin-left: calc(62px + 12px);
+    	margin-left: calc(62px + 24px);
 	}
 	#chat-room .chat.assistant
 	{
 		text-align: left;
-		margin-right: calc(62px + 12px);
+		margin-right: calc(62px + 24px);
 	}
 	#chat-control
 	{
 		display: flex;
 		justify-content: space-between;
+		flex-wrap: wrap;
 	}
 	#chat-control #chat-field
 	{
-		width: calc(100% - 62px - 12px);
+		width: 100%;
 		height: 65px;
+	}
+	#chat-control #chat-file
+	{
+		width: calc(100% - 62px - 24px);
+		margin-top: 12px;
 	}
 	#chat-control #chat-send
 	{
 		width: 62px;
+		margin-top: 12px;
+	}
+	#chat-control #chat-send:not(.sending) .secondary-text
+	{
+		display: none;
+	}
+	#chat-control #chat-send.sending .primary-text
+	{
+		display: none;
 	}
 	</style>
 
@@ -89,57 +104,93 @@
 			}
 			function checkReply()
 			{
-				$.get("./api.php?function=check_reply&params[]=<?= $active_thread["thread_id"] ?>", function(reply){
-					if (reply.code == 2)
-					{
-						for (var message of reply.messages)
-						{
-							insertNewMessage(message);
-						}
-					}
+				var thread_id = $("#chat-control [name='thread_id']").val();
 
+				// if thred is not set up, then just skip
+				if (!thread_id)
+				{
 					setTimeout(checkReply, 1000);
-				}, "json");
+				}
+
+				// if alrady set up, then do it
+				else
+				{
+					$.get("./api.php?function=check_reply&thread_id=" + thread_id, function(reply){
+						if (reply.code == 2)
+						{
+							for (var message of reply.messages)
+							{
+								insertNewMessage(message);
+							}
+						}
+
+						setTimeout(checkReply, 1000);
+					}, "json");
+				}
+			}
+			function sendMessage(callback)
+			{
+				$.ajax({
+					// Your server script to process the upload
+					url: "./api.php?function=post_new_message",
+					type: "POST",
+
+					// Form data
+					data: new FormData($("#chat-control")[0]),
+					dataType: "json",
+
+					// Tell jQuery not to process data or worry about content-type
+					// You *must* include these options!
+					cache: false,
+					contentType: false,
+					processData: false,
+
+					success: callback,
+				});
 			}
 
 			// scroll down
 			$("#chat-room").animate({ scrollTop: $("#chat-room").height() }, 0);
 
-			// if this is not new, then periodically check new chats
-			<?php if (!$new): ?>
-				checkReply();
-			<?php endif; ?>
+			// periodically check new chats
+			checkReply();
 
-			// new thread
+			// send message
+			$("#chat-control").submit(function(e){
+				e.preventDefault();
+			});
 			$("#chat-send").click(function(){
-				var value = $("#chat-field").val();
+				$("#chat-send").addClass("sending");
+				var thread_id = $("#chat-control [name='thread_id']").val();
 
 				// if it is new
-				if ($("#chat-room").attr("data-thread-id") == "null")
+				if (!thread_id)
 				{
-					$.get("./api.php?function=create_new_thread&params[]", function(thread){
-						$.post("./api.php?function=post_new_message", {
-							params: [
-								thread["thread_id"],
-								$("#chat-field").val(),
-							],
-						}, function(message){
-							window.location = "./index.php?thread_id=" + thread["thread_id"];
-						}, "json");
+					$.get("./api.php?function=create_new_thread", function(thread){
+						$("#chat-control [name='thread_id']").val(thread.thread_id);
+
+						sendMessage(function(message){
+							$("#chat-field").val("");
+							insertNewMessage(message);
+							$("#chat-send").removeClass("sending");
+
+							// insert session button
+							$("<a>")
+								.addClass("btn existing-thread btn-secondary")
+								.attr("href", "./index.php?thread_id=" + thread.thread_id)
+								.text("Thread " + thread.created)
+								.insertAfter("#new-thread");
+						});
 					}, "json");
 				}
 				// if existing
 				else
 				{
-					$.post("./api.php?function=post_new_message", {
-						params: [
-							$("#chat-room").attr("data-thread-id"),
-							$("#chat-field").val(),
-						],
-					}, function(message){
+					sendMessage(function(message){
 						$("#chat-field").val("");
 						insertNewMessage(message);
-					}, "json");
+						$("#chat-send").removeClass("sending");
+					});
 				}
 			});
 		});
@@ -165,7 +216,7 @@
 			</div>
 			<div class="col-9">
 				<h4 class="text-center mb-4">Chat Room</h4>
-				<div id="chat-room" data-thread-id="<?= $new ? "null" : $active_thread["thread_id"] ?>">
+				<div id="chat-room">
 					<?php if (!$new): ?>
 						<?php $messages = library::get_messages($active_thread["thread_id"]); ?>
 						<?php foreach ($messages as $message): ?>
@@ -175,10 +226,15 @@
 						<?php endforeach; ?>
 					<?php endif; ?>
 				</div>
-  				<div id="chat-control" class="form-group">
-					<textarea id="chat-field" class="form-control"></textarea>
-					<button id="chat-send" class="btn btn-primary">Send</button>
-  				</div>
+  				<form id="chat-control" class="form-group">
+					<input type="hidden" name="thread_id" value="<?= $new ? "" : $active_thread["thread_id"] ?>" />
+					<textarea id="chat-field" class="form-control" name="message"></textarea>
+					<input id="chat-file" type="file" name="file_path" />
+					<button id="chat-send" class="btn btn-primary" type="button">
+						<span class="primary-text">Send</span>
+						<div class="secondary-text spinner-border spinner-border-sm" role="status"></div>
+					</button>
+  				</form>
 			</div>
 		</div>
 	</div>
