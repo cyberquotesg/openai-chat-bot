@@ -204,7 +204,7 @@ class library
 		return json_decode($result, true);
 	}
 	// done
-	public static function create_run($thread_id)
+	public static function create_run($thread_id, $use_streaming = false)
 	{
 		$ch = curl_init();
 
@@ -220,7 +220,27 @@ class library
 		curl_setopt($ch, CURLOPT_POST, true);
 		curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
 			"assistant_id" => self::$assistant_id,
+			"stream" => !!$use_streaming,
 		]));
+		if ($use_streaming)
+		{
+			$stream_data = [];
+			curl_setopt($ch, CURLOPT_WRITEFUNCTION, function($curl, $openai_said) use (&$stream_data) {
+				$openai_said_exploded = explode("data:", $openai_said);
+
+				$event = $openai_said_exploded[0];
+				$event = str_replace("event:", "", $event);
+				$event = trim($event);
+
+				$data = $openai_said_exploded[1];
+				$data = trim($data);
+				$data = json_decode($data, true);
+
+				$stream_data[$event] = $data;
+
+    			return strlen($openai_said);
+			});
+		}
 
 		$result = curl_exec($ch);
 		$info = curl_getinfo($ch);
@@ -228,7 +248,7 @@ class library
 
 		curl_close($ch);
 
-		return json_decode($result, true);
+		return $use_streaming ? $stream_data : json_decode($result, true);
 	}
 	// done
 	public static function retrieve_run($thread_id, $run_id)
@@ -493,6 +513,121 @@ class library
 			return [
 				"code" => 1,
 			];
+		}
+	}
+	// done
+	public static function post_new_message_stream($thread_id, $message, $file_path = null)
+	{
+		// file is provided
+		if ($file_path)
+		{
+			// upload file
+			$file = self::create_file($file_path);
+
+			// adjust data from openai to fit with db
+			$file = [
+				"created" => self::get_time_object($file["created_at"])->format("Y/m/d H:i:s"),
+				"file_id" => $file["id"],
+				"file_name" => $file["filename"],
+			];
+
+			// save file to db
+			self::db("
+				INSERT INTO openai_chatbot_file (created, file_id, file_name)
+				VALUES ('" . $file["created"] . "', '" . $file["file_id"] . "', '" . $file["file_name"] . "')
+			");
+		}
+		else
+		{
+			$file = [
+				"created" => "",
+				"file_id" => "",
+				"file_name" => "",
+			];
+		}
+
+		// create message
+		$message = self::create_message($thread_id, $message, $file["file_id"]);
+
+		// adjust data from openai to fit with db
+		$message = [
+			"created" => self::get_time_object($message["created_at"])->format("Y/m/d H:i:s"),
+			"thread_id" => $message["thread_id"],
+			"message_id" => $message["id"],
+			"file_id" => $file["file_id"],
+			"file_name" => $file["file_name"],
+			"role" => $message["role"],
+			"content" => $message["content"][0]["text"]["value"],
+		];
+
+		// save message to db
+		self::db("
+			INSERT INTO openai_chatbot_message (created, thread_id, message_id, file_id, role, content)
+			VALUES ('" . $message["created"] . "', '" . $message["thread_id"] . "', '" . $message["message_id"] . "', '" . $message["file_id"] . "', '" . $message["role"] . "', '" . str_replace("'", "\\'", $message["content"]) . "')
+		");
+
+		// create run
+		$run = self::create_run($thread_id, true);
+
+		// run completed
+		if ($run["thread.message.completed"])
+		{
+			$completed_message = $run["thread.message.completed"];
+
+			// clean up thread record
+			self::db("
+				UPDATE openai_chatbot_thread
+				SET run_id = '', run_status = 'completed'
+				WHERE thread_id = '" . $thread_id . "'
+			");
+
+			// return as array
+			$messages = [
+				$message,
+			];
+
+			// compile reply
+			foreach ($completed_message["content"] as $openai_said)
+			{
+				// adjust data from openai to fit with db
+				$reply = [
+					"created" => self::get_time_object($completed_message["created_at"])->format("Y/m/d H:i:s"),
+					"thread_id" => $completed_message["thread_id"],
+					"message_id" => $completed_message["id"],
+					"file_id" => $file["file_id"],
+					"file_name" => $file["file_name"],
+					"role" => $completed_message["role"],
+					"content" => $openai_said["text"]["value"],
+				];
+
+				// save message to db
+				self::db("
+					INSERT INTO openai_chatbot_message (created, thread_id, message_id, file_id, role, content)
+					VALUES ('" . $reply["created"] . "', '" . $reply["thread_id"] . "', '" . $reply["message_id"] . "', '" . $reply["file_id"] . "', '" . $reply["role"] . "', '" . str_replace("'", "\\'", $reply["content"]) . "')
+				");
+
+				$messages[] = $reply;
+			}
+
+			return $messages;
+		}
+
+		// run failed
+		else
+		{
+			// clean up thread record
+			self::db("
+				UPDATE openai_chatbot_thread
+				SET run_id = '', run_status = 'failed'
+				WHERE thread_id = '" . $thread_id . "'
+			");
+
+			// return as array
+			$messages = [
+				$message,
+			];
+
+			return $messages;
 		}
 	}
 }

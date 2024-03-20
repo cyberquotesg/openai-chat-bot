@@ -113,17 +113,24 @@
 	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
 	<script type="text/javascript">
 		jQuery(function($){
-			function insertNewMessage(message)
+			var useStream = true;
+			function insertNewMessage(messageOrMessages)
 			{
-				var html = '';
-				html += '<div class="chat ' + message.role + '">';
-					html += '<small>' + message.created + '</small>';
-					if (message.file_name) html += '<hr />Uploaded file: ' + message.file_name;
-					if (message.content) html += '<hr />' + message.content;
-				html += '</div>';
+				// if single message, make it array
+				if (!Array.isArray(messageOrMessages)) messageOrMessages = [messageOrMessages];
 
-				$("#chat-room .chat.sending").before(html);
-				$("#chat-room").animate({ scrollTop: $("#chat-room").prop('scrollHeight') }, 1000);
+				for (var message of messageOrMessages)
+				{
+					var html = '';
+					html += '<div class="chat ' + message.role + '">';
+						html += '<small>' + message.created + '</small>';
+						if (message.file_name) html += '<hr />Uploaded file: ' + message.file_name;
+						if (message.content) html += '<hr />' + message.content;
+					html += '</div>';
+
+					$("#chat-room .chat.sending").before(html);
+					$("#chat-room").animate({ scrollTop: $("#chat-room").prop('scrollHeight') }, 1000);
+				}
 			}
 			function checkReply()
 			{
@@ -155,7 +162,7 @@
 			{
 				$.ajax({
 					// Your server script to process the upload
-					url: "./api.php?function=post_new_message",
+					url: "./api.php?function=" + (useStream ? "post_new_message_stream" : "post_new_message"),
 					type: "POST",
 
 					// Form data
@@ -187,8 +194,8 @@
 					$.get("./api.php?function=create_new_thread", function(thread){
 						$("#chat-control [name='thread_id']").val(thread.thread_id);
 
-						sendMessageEngine(function(message){
-							insertNewMessage(message);
+						sendMessageEngine(function(messageOrMessages){
+							insertNewMessage(messageOrMessages);
 							$("#chat-room").removeClass("sending");
 							$("#chat-send").removeClass("sending");
 
@@ -215,8 +222,8 @@
 				// if existing
 				else
 				{
-					sendMessageEngine(function(message){
-						insertNewMessage(message);
+					sendMessageEngine(function(messageOrMessages){
+						insertNewMessage(messageOrMessages);
 						$("#chat-room").removeClass("sending");
 						$("#chat-send").removeClass("sending");
 					});
@@ -226,8 +233,8 @@
 			// scroll down
 			$("#chat-room").animate({ scrollTop: $("#chat-room").prop('scrollHeight') }, 0);
 
-			// periodically check new chats
-			checkReply();
+			// periodically check new chats (if not using stream)
+			if (!useStream) checkReply();
 
 			// send message
 			$("#chat-control").submit(function(e){
