@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS `openai_chatbot_file` (
   `created` varchar(25) NOT NULL,
   `file_id` varchar(100) NOT NULL,
   `file_name` varchar(200) NOT NULL,
+  `file_size` int(11) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -125,30 +126,6 @@ class library
 
 	// ================================================================================================== communication with openai
 	// done
-	public static function create_thread()
-	{
-		$ch = curl_init();
-
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($ch, CURLOPT_URL, "https://api.openai.com/v1/threads");
-		curl_setopt($ch, CURLOPT_HTTPHEADER, [
-			"Content-Type: application/json",
-			"Authorization: Bearer " . self::$openai_key,
-			"OpenAI-Beta: assistants=v1",
-		]);
-		curl_setopt($ch, CURLOPT_POST, true);
-		curl_setopt($ch, CURLOPT_POSTFIELDS, "");
-
-		$result = curl_exec($ch);
-		$info = curl_getinfo($ch);
-		$error = curl_error($ch);
-
-		curl_close($ch);
-
-		return json_decode($result, true);
-	}
 	public static function create_file($file_path)
 	{
 		$ch = curl_init();
@@ -165,6 +142,31 @@ class library
             "file" => new CURLFile($file_path),
             "purpose" => "assistants",
         ]);
+
+		$result = curl_exec($ch);
+		$info = curl_getinfo($ch);
+		$error = curl_error($ch);
+
+		curl_close($ch);
+
+		return json_decode($result, true);
+	}
+	// done
+	public static function create_thread()
+	{
+		$ch = curl_init();
+
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_URL, "https://api.openai.com/v1/threads");
+		curl_setopt($ch, CURLOPT_HTTPHEADER, [
+			"Content-Type: application/json",
+			"Authorization: Bearer " . self::$openai_key,
+			"OpenAI-Beta: assistants=v1",
+		]);
+		curl_setopt($ch, CURLOPT_POST, true);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, "");
 
 		$result = curl_exec($ch);
 		$info = curl_getinfo($ch);
@@ -372,13 +374,17 @@ class library
 				"created" => self::get_time_object($file["created_at"])->format("Y/m/d H:i:s"),
 				"file_id" => $file["id"],
 				"file_name" => $file["filename"],
+				"file_size" => filesize($file_path),
 			];
 
 			// save file to db
 			self::db("
-				INSERT INTO openai_chatbot_file (created, file_id, file_name)
-				VALUES ('" . $file["created"] . "', '" . $file["file_id"] . "', '" . $file["file_name"] . "')
+				INSERT INTO openai_chatbot_file (created, file_id, file_name, file_size)
+				VALUES ('" . $file["created"] . "', '" . $file["file_id"] . "', '" . $file["file_name"] . "', " . $file["file_size"] . ")
 			");
+
+			$time_for_sleep = round($file["file_size"] / 1024 / 1024) * 2 + 2;
+			sleep($time_for_sleep);
 		}
 		else
 		{
@@ -386,6 +392,7 @@ class library
 				"created" => "",
 				"file_id" => "",
 				"file_name" => "",
+				"file_size" => 0,
 			];
 		}
 
@@ -529,13 +536,17 @@ class library
 				"created" => self::get_time_object($file["created_at"])->format("Y/m/d H:i:s"),
 				"file_id" => $file["id"],
 				"file_name" => $file["filename"],
+				"file_size" => filesize($file_path),
 			];
 
 			// save file to db
 			self::db("
-				INSERT INTO openai_chatbot_file (created, file_id, file_name)
-				VALUES ('" . $file["created"] . "', '" . $file["file_id"] . "', '" . $file["file_name"] . "')
+				INSERT INTO openai_chatbot_file (created, file_id, file_name, file_size)
+				VALUES ('" . $file["created"] . "', '" . $file["file_id"] . "', '" . $file["file_name"] . "', " . $file["file_size"] . ")
 			");
+
+			$time_for_sleep = round($file["file_size"] / 1024 / 1024) * 2 + 2;
+			sleep($time_for_sleep);
 		}
 		else
 		{
@@ -543,6 +554,7 @@ class library
 				"created" => "",
 				"file_id" => "",
 				"file_name" => "",
+				"file_size" => 0,
 			];
 		}
 

@@ -15,15 +15,28 @@
 
 	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
 	<style type="text/css">
+	.container
+	{
+		padding-top: 24px;
+	    padding-bottom: 24px;
+	    border-radius: 4px;
+	    overflow: hidden;
+		background: #e1e1e1;
+	}
 	#threads
 	{
-		height: calc(100vh - 275px + 65px);
+		height: calc(100vh - 350px + 65px);
+		padding-left: 12px;
 		padding-right: 24px;
 		overflow-y: scroll;
 	}
 	#threads a
 	{
 		width: 100%;
+	}
+	#threads a[class*='outline']:not(:hover)
+	{
+		background: white;
 	}
 	#threads a#new-thread
 	{
@@ -35,7 +48,7 @@
 	}
 	#chat-room
 	{
-		height: calc(100vh - 275px);
+		height: calc(100vh - 350px);
 		padding-right: 24px;
 		overflow-y: scroll;
 	}
@@ -51,6 +64,7 @@
 	    border: 1px solid grey;
 	    border-radius: 4px;
 	    white-space: break-spaces;
+	    background: white;
 	}
 	#chat-room .chat.user
 	{
@@ -83,6 +97,7 @@
 	{
 		width: 100%;
 		height: 65px;
+		border: 1px solid grey;
 	}
 	#chat-control #chat-file-delete
 	{
@@ -114,7 +129,7 @@
 	<script type="text/javascript">
 		jQuery(function($){
 			var useStream = true;
-			function insertNewMessage(messageOrMessages)
+			function insertNewMessageToRoom(messageOrMessages)
 			{
 				// if single message, make it array
 				if (!Array.isArray(messageOrMessages)) messageOrMessages = [messageOrMessages];
@@ -150,7 +165,7 @@
 						{
 							for (var message of reply.messages)
 							{
-								insertNewMessage(message);
+								insertNewMessageToRoom(message);
 							}
 						}
 
@@ -195,7 +210,8 @@
 						$("#chat-control [name='thread_id']").val(thread.thread_id);
 
 						sendMessageEngine(function(messageOrMessages){
-							insertNewMessage(messageOrMessages);
+							$("#chat-file").val("");
+							insertNewMessageToRoom(messageOrMessages);
 							$("#chat-room").removeClass("sending");
 							$("#chat-send").removeClass("sending");
 
@@ -207,7 +223,7 @@
 								.removeClass("btn-secondary")
 								.addClass("btn-outline-secondary");
 
-							// insert session button
+							// insert thread button
 							$("<a>")
 								.addClass("btn existing-thread btn-secondary")
 								.attr("href", "./index.php?thread_id=" + thread.thread_id)
@@ -223,7 +239,8 @@
 				else
 				{
 					sendMessageEngine(function(messageOrMessages){
-						insertNewMessage(messageOrMessages);
+						$("#chat-file").val("");
+						insertNewMessageToRoom(messageOrMessages);
 						$("#chat-room").removeClass("sending");
 						$("#chat-send").removeClass("sending");
 					});
@@ -258,7 +275,7 @@
 	<div class="container">
 		<div class="row">
 			<div class="col-3">
-				<h4 class="text-center mb-4">Sessions</h4>
+				<h4 class="text-center mb-4">Threads</h4>
 				<div id="threads">
 					<a id="new-thread" class="btn <?= $new ? "btn-primary" : "btn-outline-primary" ?>" href="./index.php">New Thread</a>
 
